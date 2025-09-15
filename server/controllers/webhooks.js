@@ -71,14 +71,15 @@ export const stripeWebhooks = async(request ,response)=>{
         response.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the event
+    try{
+        // Handle the event
     switch (event.type) {
         case 'payment_intent.succeeded':{
             const paymentIntent = event.data.object;
             const paymentIntentId = paymentIntent.id;
 
             const session = await stripeInstance.checkout.sessions.list({
-                payment_intent:paymentIntentId
+                payment_intent : paymentIntentId
             })
 
             const {purchaseId} = session.data[0].metadata;
@@ -123,4 +124,7 @@ export const stripeWebhooks = async(request ,response)=>{
 
     // Return a response to acknowledge receipt of the event
     response.json({received: true});
+    }catch(error){
+        response.status(500).json({success:true, message:error.message});
+    }
 }  
