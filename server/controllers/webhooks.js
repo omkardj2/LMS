@@ -65,19 +65,25 @@ export const stripeWebhooks = async(request ,response)=>{
     let event;
 
     try {
-        event = stripeInstance.webhooks.constructEvent(request.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        event = Stripe.webhooks.constructEvent(request.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     }
     catch (err) {
         console.error('Webhook verification failed:', err.message);
-        return response.status(400).send(`Webhook Error: ${err.message}`);
+        response.status(400).send(`Webhook Error: ${err.message}`);
     }
 
     try{
         // Handle the event
     switch (event.type) {
-        case 'checkout.session.completed':{
-            const session = event.data.object;
-            const purchaseId = session?.metadata?.purchaseId;
+        case 'payment_intent.succeeded':{
+            const paymentIntent = event.data.object;
+            const paymentIntentId = paymentIntent.id;
+
+            const session = await stripeInstance.checkout.sessions.list({
+                payment_intent: paymentIntentId
+            })
+
+            const { purchaseId } = session.data[0].metadata;
 
             if (!purchaseId) {
                 console.log('No purchaseId found in session metadata');
@@ -98,18 +104,13 @@ export const stripeWebhooks = async(request ,response)=>{
                 break;
             }
 
-            // Push user ID, not the whole user object, and make it idempotent
-            if (!courseData.enrolledStudents.some(id => id.toString() === userData._id.toString())) {
-                courseData.enrolledStudents.push(userData._id);
-                await courseData.save();
-            }
+            courseData.enrolledStudents.push(userData);
+            await courseData.save();
 
-            if (!userData.enrolledCourses.some(id => id.toString() === courseData._id.toString())) {
-                userData.enrolledCourses.push(courseData._id);
-                await userData.save();
-            }
+            userData.enrolledCourses.push(courseData._id);
+            await userData.save();
 
-            purchaseData.status = 'completed';
+            purchaseData.status = 'completed'
             await purchaseData.save();
 
             console.log('Purchase completed successfully:', purchaseId);
@@ -119,28 +120,14 @@ export const stripeWebhooks = async(request ,response)=>{
             const paymentIntent = event.data.object;
             const paymentIntentId = paymentIntent.id;
 
-            const sessions = await stripeInstance.checkout.sessions.list({
-                payment_intent: paymentIntentId,
-                limit: 1
+            const session = await stripeInstance.checkout.sessions.list({
+                payment_intent: paymentIntentId
             });
 
-            if (sessions.data.length === 0) {
-                console.log('No session found for payment intent:', paymentIntentId);
-                break;
-            }
-
-            const purchaseId = sessions.data[0]?.metadata?.purchaseId;
-            if (!purchaseId) {
-                console.log('No purchaseId in session metadata');
-                break;
-            }
-
+            const {purchaseId} = session.data[0].metadata;
             const purchaseData = await Purchase.findById(purchaseId);
-            if (purchaseData) {
-                purchaseData.status = 'failed';
-                await purchaseData.save();
-                console.log('Purchase marked as failed:', purchaseId);
-            }
+            purchaseData.status = 'failed'
+            await purchaseData.save()
             
             break;
         }
