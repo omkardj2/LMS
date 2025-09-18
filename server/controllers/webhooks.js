@@ -1,5 +1,5 @@
 import { Webhook } from "svix";
-import User from "../models/User.js";
+import User from "../models/user.js";
 import Stripe from "stripe";
 import Course from "../models/course.js";
 import { Purchase } from "../models/purchase.js";
