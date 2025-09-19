@@ -62,10 +62,10 @@ export const getEducatorCourses = async (req,res) => {
 
 //get educator dashboard data (total earnings,Enrolled Students, no. of Courses)
 
-export const educatorDashboardData = async ()=>{
+export const educatorDashboardData = async (req,res)=>{
     try{
         const educator = req.auth.userId;
-        const courses = await Course.find(educator);
+        const courses = await Course.find({educator});
         const totalCourses = courses.length;
 
         const courseIds = courses.map((course)=> course._id);
@@ -82,7 +82,7 @@ export const educatorDashboardData = async ()=>{
         const enrolledStudentsData = [];
         for(const course of courses){
             const students = await User.find({
-                _id: {$in: Course.enrolledStudents}
+                _id: {$in: course.enrolledStudents}
             }, 'name imageUrl');
 
             students.forEach( student => {
@@ -98,12 +98,12 @@ export const educatorDashboardData = async ()=>{
         }})
 
     }catch(error){
-        res.status(500).json({success:false, message: error.message});
+        res.json({success:false, message: error.message});
     }
 }
 
 //Get enrolled students data with purchase data
-export const getEnrolledStudentsData = async () => {
+export const getEnrolledStudentsData = async (req,res) => {
     try{
         const educator = req.auth.userId;
         const courses = await Course.find({educator});
